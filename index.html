@@ -1,0 +1,264 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CineLoor | Reserva de entradas</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b0e14;color:#f5f5f5;font-family:Arial,sans-serif}
+header{padding:24px 7%;background:#121722;border-bottom:1px solid #292f3d}
+header h1{margin:0;color:#ff454f}
+header p{color:#aab2c3;margin-bottom:0}
+main{max-width:1100px;margin:30px auto;padding:0 20px}
+.panel{background:#141a25;border:1px solid #293244;border-radius:14px;padding:22px;margin-bottom:22px}
+h2{margin-top:0}
+label{display:block;margin:14px 0 7px;color:#cbd2df}
+select,input,button{font-size:15px;border-radius:8px;padding:12px}
+select,input{width:100%;background:#0c111b;color:white;border:1px solid #394358}
+button{border:0;background:#ff454f;color:white;font-weight:bold;cursor:pointer}
+button:hover{background:#d92f3a}
+button:disabled{background:#444b59;cursor:not-allowed}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:20px}
+.pantalla{margin:24px auto 30px;background:#dfe6f2;color:#182033;text-align:center;padding:9px;border-radius:50% 50% 8px 8px;max-width:460px;font-weight:bold}
+.asientos{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px;max-width:450px;margin:auto}
+.asiento{padding:10px 2px;background:#258b60;font-size:13px}
+.asiento.elegido{background:#e9b52f;color:#161616}
+.asiento.ocupado{background:#555d6b;cursor:not-allowed}
+.leyenda{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin:18px 0;color:#cbd2df;font-size:13px}
+.punto{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px}
+.reserva{border-bottom:1px solid #303747;padding:12px 0;display:flex;justify-content:space-between;gap:12px;align-items:center}
+.reserva button{padding:8px;font-size:12px}
+.mensaje{color:#ffcf65;min-height:20px;margin-top:12px}
+.precio{font-size:26px;font-weight:bold;color:#ff626a}
+footer{text-align:center;padding:24px;color:#8892a5}
+@media(max-width:500px){header{padding:20px}.panel{padding:15px}.asientos{gap:5px}.asiento{font-size:12px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎬 CineReserva</h1>
+  <p>Tu película, tu asiento, tu experiencia.</p>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>🎥 Películas disponibles</h2>
+    <label for="pelicula">Selecciona una película</label>
+    <select id="pelicula">
+      <option value="Aventura Espacial">Aventura Espacial — $5.00</option>
+      <option value="El Reino Perdido">El Reino Perdido — $4.50</option>
+      <option value="Noche de Misterio">Noche de Misterio — $4.00</option>
+    </select>
+    <p>Elige tu película y después selecciona los asientos que prefieras.</p>
+  </section>
+
+  <div class="grid">
+    <section class="panel">
+      <h2>🪑 Selección de asientos</h2>
+      <div class="pantalla">PANTALLA</div>
+      <div class="asientos" id="asientos"></div>
+      <div class="leyenda">
+        <span><i class="punto" style="background:#258b60"></i>Libre</span>
+        <span><i class="punto" style="background:#e9b52f"></i>Elegido</span>
+        <span><i class="punto" style="background:#555d6b"></i>Ocupado</span>
+      </div>
+      <p id="seleccion">Asientos elegidos: ninguno</p>
+      <p>Total a pagar: <span class="precio" id="total">$0.00</span></p>
+      <button id="reservar">Confirmar reserva</button>
+      <p class="mensaje" id="mensaje" role="status"></p>
+    </section>
+
+    <section class="panel">
+      <h2>🎟️ Mis reservas</h2>
+      <div id="reservas"></div>
+      <p id="sinReservas">Todavía no hay reservas.</p>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h2>📊 Resumen del cine</h2>
+    <div class="grid">
+      <div><p>Entradas reservadas</p><h2 id="cantidad">0</h2></div>
+      <div><p>Recaudación registrada</p><h2 id="recaudacion">$0.00</h2></div>
+      <div><p>Asientos disponibles</p><h2 id="disponibles">30</h2></div>
+    </div>
+    <p style="color:#aab2c3">Los cálculos se actualizan al reservar o cancelar entradas.</p>
+  </section>
+</main>
+
+
+<footer>
+  © 2026 CineReserva — Proyecto académico
+  <br>
+  Autora: Evelyn Loor 
+</footer>
+
+<script>
+const precios = {
+  "Aventura Espacial": 5,
+  "El Reino Perdido": 4.5,
+  "Noche de Misterio": 4
+};
+
+const clave = "cineReservaDatosV1";
+let reservas = [];
+let elegidos = [];
+
+try {
+  reservas = JSON.parse(localStorage.getItem(clave) || "[]");
+  if (!Array.isArray(reservas)) reservas = [];
+} catch {
+  reservas = [];
+}
+
+const pelicula = document.getElementById("pelicula");
+const contenedor = document.getElementById("asientos");
+const seleccion = document.getElementById("seleccion");
+const total = document.getElementById("total");
+const mensaje = document.getElementById("mensaje");
+
+function guardar() {
+  localStorage.setItem(clave, JSON.stringify(reservas));
+}
+
+function ocupadosDePelicula() {
+  return reservas
+    .filter(r => r.pelicula === pelicula.value)
+    .flatMap(r => r.asientos);
+}
+
+function dibujarAsientos() {
+  contenedor.innerHTML = "";
+  const ocupados = ocupadosDePelicula();
+  elegidos = elegidos.filter(a => !ocupados.includes(a));
+
+  for (let i = 1; i <= 30; i++) {
+    const asiento = "A" + i;
+    const boton = document.createElement("button");
+    boton.textContent = asiento;
+    boton.className = "asiento";
+
+    if (ocupados.includes(asiento)) {
+      boton.classList.add("ocupado");
+      boton.disabled = true;
+      boton.title = "Este asiento ya está reservado";
+    } else if (elegidos.includes(asiento)) {
+      boton.classList.add("elegido");
+    }
+
+    boton.addEventListener("click", () => {
+      if (elegidos.includes(asiento)) {
+        elegidos = elegidos.filter(a => a !== asiento);
+      } else {
+        elegidos.push(asiento);
+      }
+      mensaje.textContent = "";
+      dibujarAsientos();
+      actualizarTotal();
+    });
+
+    contenedor.appendChild(boton);
+  }
+  actualizarTotal();
+  actualizarResumen();
+}
+
+function actualizarTotal() {
+  const importe = elegidos.length * precios[pelicula.value];
+  total.textContent = "$" + importe.toFixed(2);
+  seleccion.textContent = "Asientos elegidos: " +
+    (elegidos.length ? elegidos.join(", ") : "ninguno");
+}
+
+function confirmarReserva() {
+  if (!elegidos.length) {
+    mensaje.textContent = "Selecciona al menos un asiento.";
+    return;
+  }
+
+  const ocupados = ocupadosDePelicula();
+  if (elegidos.some(a => ocupados.includes(a))) {
+    mensaje.textContent = "Uno de los asientos ya está ocupado. Intenta otra vez.";
+    dibujarAsientos();
+    return;
+  }
+
+  const reserva = {
+    id: Date.now() + Math.random(),
+    pelicula: pelicula.value,
+    asientos: [...elegidos],
+    precio: precios[pelicula.value],
+    fecha: new Date().toLocaleString("es-EC")
+  };
+
+  reservas.push(reserva);
+  guardar();
+  elegidos = [];
+  mensaje.textContent = "¡Reserva confirmada correctamente!";
+  dibujarReservas();
+  dibujarAsientos();
+}
+
+function cancelarReserva(id) {
+  if (!confirm("¿Seguro que deseas cancelar esta reserva?")) return;
+  reservas = reservas.filter(r => r.id !== id);
+  guardar();
+  mensaje.textContent = "Reserva cancelada.";
+  dibujarReservas();
+  dibujarAsientos();
+}
+
+function dibujarReservas() {
+  const lista = document.getElementById("reservas");
+  lista.innerHTML = "";
+  document.getElementById("sinReservas").style.display =
+    reservas.length ? "none" : "block";
+
+  reservas.forEach(r => {
+    const fila = document.createElement("div");
+    fila.className = "reserva";
+    const info = document.createElement("div");
+    const nombre = document.createElement("strong");
+    nombre.textContent = r.pelicula;
+    const detalle = document.createElement("div");
+    detalle.textContent = r.asientos.join(", ") + " · $" +
+      (r.asientos.length * r.precio).toFixed(2);
+    const fecha = document.createElement("small");
+    fecha.textContent = r.fecha;
+    fecha.style.color = "#aab2c3";
+    info.append(nombre, document.createElement("br"), detalle,
+      document.createElement("br"), fecha);
+
+    const cancelar = document.createElement("button");
+    cancelar.textContent = "Cancelar";
+    cancelar.addEventListener("click", () => cancelarReserva(r.id));
+    fila.append(info, cancelar);
+    lista.appendChild(fila);
+  });
+}
+
+function actualizarResumen() {
+  const entradas = reservas.reduce((s, r) => s + r.asientos.length, 0);
+  const dinero = reservas.reduce((s, r) => s + r.asientos.length * r.precio, 0);
+  document.getElementById("cantidad").textContent = entradas;
+  document.getElementById("recaudacion").textContent = "$" + dinero.toFixed(2);
+  document.getElementById("disponibles").textContent =
+    30 - ocupadosDePelicula().length;
+}
+
+pelicula.addEventListener("change", () => {
+  elegidos = [];
+  mensaje.textContent = "";
+  dibujarAsientos();
+});
+
+document.getElementById("reservar")
+  .addEventListener("click", confirmarReserva);
+
+dibujarReservas();
+dibujarAsientos();
+</script>
+</body>
+</html>
